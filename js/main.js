@@ -88,15 +88,44 @@ Vue.component('task-card', {
             <div class="task-actions">
                 <button @click="editTask">Редактировать</button>
                 <button @click="deleteTask" v-if="columnId === 'planned'">Удалить</button>
+                <button @click="moveTask" v-if="!isLastColumn">
+                    {{ moveButtonText }}
+                </button>
             </div>
         </div>
     `,
+    computed: {
+        isLastColumn() {
+            return this.columnId === 'completed';
+        },
+       
+        moveButtonText() {
+            const moves = {
+                'planned': 'В работу',
+                'in-progress': 'В тестирование',
+                'testing': 'В выполненные'
+            };
+            return moves[this.columnId] || 'Далее';
+        }
+    },
     methods: {
         editTask() {
             eventBus.$emit('edit-task', this.task);
         },
         deleteTask() {
                 eventBus.$emit('delete-task', this.task.id);
+        },
+        moveTask() {
+            const moves = {
+                'planned': 'in-progress',
+                'in-progress': 'testing',
+                'testing': 'completed'
+            };
+           
+            eventBus.$emit('move-task', {
+                taskId: this.task.id,
+                toColumn: moves[this.columnId]
+            });
         }
     }
 })
@@ -224,6 +253,14 @@ let app = new Vue({
                 deadline: '2026-03-18',
                 createdAt: new Date().toLocaleString(),
                 status: 'testing'
+            },
+            {
+                id: 4,
+                title: 'aaa',
+                description: 'AA',
+                deadline: '2026-03-19',
+                createdAt: new Date().toLocaleString(),
+                status: 'completed'
             }
         ]
     },
@@ -256,11 +293,19 @@ let app = new Vue({
        
         deleteTask(taskId) {
             this.tasks = this.tasks.filter(task => task.id !== taskId);
+        },
+        moveTask(data) {
+            const index = this.tasks.findIndex(t => t.id === data.taskId);
+            if (index !== -1) {
+                this.tasks[index].status = data.toColumn;
+                this.tasks = [...this.tasks];
+            }
         }
     },
     mounted() {
         eventBus.$on('create-task', this.createTask);
-        eventBus.$on('update-task', this.updateTask);  // Подписываемся на обновление
-        eventBus.$on('delete-task', this.deleteTask);  // Подписываемся на удаление
+        eventBus.$on('update-task', this.updateTask);  
+        eventBus.$on('delete-task', this.deleteTask);
+        eventBus.$on('move-task', this.moveTask);  
     }
 })
