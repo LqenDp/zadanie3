@@ -149,3 +149,27 @@ button:hover {
 .task-card .task-deadline[style*="color: #ff4444"] {
    font-weight: bold;
 }
+.task-card.completed {
+   background-color: #f0f0f0;
+   border-color: #ddd;
+   opacity: 0.9;
+}
+
+.task-card.overdue {
+   background-color: #ffe6e6; 
+   border-color: #ffcccc;
+   border-left: 4px solid #ff4444;  
+}
+
+.task-card.overdue .task-title {
+   color: #cc0000;
+}
+
+.task-card.overdue .task-deadline {
+   color: #ff4444;
+   font-weight: bold;
+}
+
+.task-card.overdue {
+   animation: pulse 2s infinite;
+}

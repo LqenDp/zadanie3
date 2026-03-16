@@ -91,31 +91,33 @@ Vue.component('task-card', {
         }
     },
     template: `
-        <div class="task-card">
-            <div class="task-header">
-                <span class="task-title">{{ task.title }}</span>
-                <span class="task-date">создано: {{ task.createdAt }}</span>
-            </div>
+    
+        <div class="task-card" :class="cardClass">
+        <div class="task-header">
+            <span class="task-title">{{ task.title }}</span>
+            <span class="task-date">создано: {{ task.createdAt }}</span>
+        </div>
        
-            <div class="task-description">{{ task.description }}</div>
+        <div class="task-description">{{ task.description }}</div>
        
-            <div class="task-deadline">
-                Дедлайн: {{ task.deadline }}
-                <span v-if="task.editedAt"> | ред.: {{ task.editedAt }}</span>
-            </div>
-            <div v-if="task.returnReason" class="task-deadline" style="color: #ff4444;">
-                Причина возврата: {{ task.returnReason }}
-            </div>
+        <div class="task-deadline">
+            Дедлайн: {{ task.deadline }}
+            <span v-if="task.editedAt"> | ред.: {{ task.editedAt }}</span>
+         
+            <span v-if="isOverdue" style="color: #ff4444; font-weight: bold;"> (просрочено!)</span>
+        </div>
        
-            <div class="task-actions">
-                <button @click="editTask">Редактировать</button>
-                <button @click="deleteTask" v-if="columnId === 'planned'">Удалить</button>
-                <button @click="moveTask" v-if="!isLastColumn">
-                    {{ moveButtonText }}
-                </button>
-                <button @click="returnToWork" v-if="columnId === 'testing'">
-                    Вернуть в работу
-                </button>
+        <div v-if="task.returnReason" class="task-deadline" style="color: #ff4444;">
+            Причина возврата: {{ task.returnReason }}
+        </div>
+       
+        <div class="task-actions">
+            <button @click="editTask">Редактировать</button>
+            <button @click="deleteTask" v-if="columnId === 'planned'">Удалить</button>
+            <button @click="moveTask" v-if="!isLastColumn">{{ moveButtonText }}</button>
+            <button @click="returnToWork" v-if="columnId === 'testing'">
+                Вернуть в работу
+            </button>
             </div>
         </div>
     `,
@@ -131,6 +133,19 @@ Vue.component('task-card', {
                 'testing': 'В выполненные'
             };
             return moves[this.columnId] || 'Далее';
+        },
+        isOverdue() {
+            const today = new Date();
+            const deadline = new Date(this.task.deadline);
+            return deadline < today;
+        },
+       
+      
+        cardClass() {
+            if (this.columnId === 'completed') {
+                return this.isOverdue ? 'overdue' : 'completed';
+            }
+            return '';
         }
     },
     methods: {
@@ -138,7 +153,7 @@ Vue.component('task-card', {
             eventBus.$emit('edit-task', this.task);
         },
         deleteTask() {
-                eventBus.$emit('delete-task', this.task.id);
+            eventBus.$emit('delete-task', this.task.id);
         },
         moveTask() {
             const moves = {
@@ -284,7 +299,7 @@ let app = new Vue({
                 id: 1,
                 title: 'ыфвв',
                 description: 'ыфв',
-                deadline: '2026-03-17',
+                deadline: '2026-03-19',
                 createdAt: new Date().toLocaleString(),
                 status: 'planned'
             },
@@ -292,7 +307,7 @@ let app = new Vue({
                 id: 2,
                 title: 'ddd',
                 description: 'dom',
-                deadline: '2026-03-16',
+                deadline: '2026-03-17',
                 createdAt: new Date().toLocaleString(),
                 status: 'in-progress'
             },
@@ -309,6 +324,14 @@ let app = new Vue({
                 title: 'aaa',
                 description: 'AA',
                 deadline: '2026-03-19',
+                createdAt: new Date().toLocaleString(),
+                status: 'completed'
+            },
+            {
+                id: 5,
+                title: 'prosr',
+                description: 'AAdddd',
+                deadline: '2026-03-02',
                 createdAt: new Date().toLocaleString(),
                 status: 'completed'
             }
@@ -347,6 +370,14 @@ let app = new Vue({
         moveTask(data) {
             const index = this.tasks.findIndex(t => t.id === data.taskId);
             if (index !== -1) {
+                if (data.toColumn === 'completed') {
+                    const task = this.tasks[index];
+                    const today = new Date();
+                    const deadline = new Date(task.deadline);
+                   
+                    console.log(`Задача "${task.title}" ${deadline < today ? 'просрочена' : 'выполнена в срок'}`);
+                }
+               
                 this.tasks[index].status = data.toColumn;
                 this.tasks = [...this.tasks];
             }
