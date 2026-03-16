@@ -1,57 +1,73 @@
 let eventBus = new Vue();
-Vue.component('task-modal', {
-   template: `
-     <div class="modal" @click.self="$emit('close')">
-       <div class="modal-content">
-         <h3>Новая задача</h3>
-         
-         <input 
-           v-model="formData.title" 
-           placeholder="Заголовок задачи"
-         >
-         
-         <textarea 
-           v-model="formData.description" 
-           placeholder="Описание задачи"
-         ></textarea>
-         <input 
-           v-model="formData.deadline" 
-           type="date"
-         >
-         
-         <div class="modal-actions">
-           <button @click="$emit('close')">Отмена</button>
-           <button @click="saveTask">Сохранить</button>
-         </div>
-       </div>
-     </div>
-   `,
-   data() {
-       return {
-           formData: {
-               title: '',
-               description: '',
-               deadline: ''
-           }
-       }
-   },
-   methods: {
-       saveTask() {
-           
-           this.$emit('save', this.formData);
 
-           this.formData = {
-               title: '',
-               description: '',
-               deadline: ''
-           };
-       }
-   }
+Vue.component('task-modal', {
+    props: {
+        task: {           
+            type: Object,
+            default: null
+        },
+        isNew: {          
+            type: Boolean,
+            default: false
+        }
+    },
+    template: `
+        <div class="modal" @click.self="$emit('close')">
+        <div class="modal-content">
+            <h3>{{ isNew ? 'Новая задача' : 'Редактирование задачи' }}</h3>
+         
+            <input 
+                v-model="formData.title" 
+                placeholder="Заголовок задачи"
+            >
+            <textarea 
+                v-model="formData.description" 
+                placeholder="Описание задачи"
+            ></textarea>
+            <input 
+                v-model="formData.deadline" 
+                type="date"
+            >
+         
+            <div class="modal-actions">
+                <button @click="$emit('close')">Отмена</button>
+                <button @click="saveTask">Сохранить</button>
+            </div>
+        </div>
+        </div>
+    `,
+    data() {
+        return {
+            formData: {
+                title: '',
+                description: '',
+                deadline: ''
+            }
+        }
+    },
+    methods: {
+        saveTask() {
+            this.$emit('save', this.formData);
+        }
+    },
+    mounted() {
+        if (this.task) {
+            this.formData = {
+                title: this.task.title,
+                description: this.task.description,
+                deadline: this.task.deadline
+            };
+        }
+    }
 })
 Vue.component('task-card', {
     props: {
-        task: {  
+        task: {
             type: Object,
+            required: true
+        },
+        columnId: {  
+            type: String,
             required: true
         }
     },
@@ -59,128 +75,192 @@ Vue.component('task-card', {
         <div class="task-card">
             <div class="task-header">
                 <span class="task-title">{{ task.title }}</span>
-                <span class="task-date">{{ task.createdAt }}</span>
+                <span class="task-date">создано: {{ task.createdAt }}</span>
             </div>
-            <div class="task-description">{{ task.description }}</div>
-            <div class="task-deadline">Дедлайн: {{ task.deadline }}</div>
+       
+        <div class="task-description">{{ task.description }}</div>
+       
+            <div class="task-deadline">
+                Дедлайн: {{ task.deadline }}
+                <span v-if="task.editedAt"> | ред.: {{ task.editedAt }}</span>
+            </div>
+       
+            <div class="task-actions">
+                <button @click="editTask">Редактировать</button>
+                <button @click="deleteTask" v-if="columnId === 'planned'">Удалить</button>
+            </div>
         </div>
-    `
+    `,
+    methods: {
+        editTask() {
+            eventBus.$emit('edit-task', this.task);
+        },
+        deleteTask() {
+                eventBus.$emit('delete-task', this.task.id);
+        }
+    }
 })
 Vue.component('kanban-board', {
-   props: {
-       tasks: {
-           type: Array,
-           required: true
-       }
-   },
-   template: `
-     <div>
-       <button @click="openNewTaskModal" style="margin-bottom: 20px;">
-         + Новая задача
-       </button>
+    props: {
+        tasks: {
+            type: Array,
+            required: true
+        }
+    },
+    template: `
+        <div>
+            <button @click="openNewTaskModal" style="margin-bottom: 20px;">
+                + Новая задача
+            </button>
        
-       <div class="kanban-board">
-         <div 
-           class="column" 
-           v-for="column in columns" 
-           :key="column.id"
-         >
-           <h2>{{ column.title }}</h2>
-           <div class="task-list">
-             <task-card
-               v-for="task in filteredTasks(column.id)"
-               :key="task.id"
-               :task="task"
-             ></task-card>
-           </div>
-         </div>
-       </div>
+        <div class="kanban-board">
+                <div 
+                    class="column" 
+                    v-for="column in columns" 
+                    :key="column.id"
+                >
+                <h2>{{ column.title }}</h2>
+                <div class="task-list">
+                    <task-card
+                        v-for="task in filteredTasks(column.id)"
+                        :key="task.id"
+                        :task="task"
+                        :column-id="column.id"  
+                    ></task-card>
+                </div>
+            </div>
+        </div>
        
-       <task-modal
-         v-if="showModal"
-         @save="saveNewTask"
-         @close="closeModal"
-       ></task-modal>
-     </div>
-   `,
-   data() {
-       return {
-           columns: [
-               { id: 'planned', title: 'Запланированные задачи' },
-               { id: 'in-progress', title: 'Задачи в работе' },
-               { id: 'testing', title: 'Тестирование' },
-               { id: 'completed', title: 'Выполненные задачи' }
-           ],
-           showModal: false  
-       }
-   },
-   methods: {
-       filteredTasks(columnId) {
-           return this.tasks.filter(task => task.status === columnId);
-       },
+        <task-modal
+            v-if="showModal"
+            :task="editingTask"      
+            :is-new="isNewTask"       
+            @save="saveTask"
+            @close="closeModal"
+        ></task-modal>
+        </div>
+    `,
+    data() {
+        return {
+            columns: [
+                { id: 'planned', title: 'Запланированные задачи' },
+                { id: 'in-progress', title: 'Задачи в работе' },
+                { id: 'testing', title: 'Тестирование' },
+                { id: 'completed', title: 'Выполненные задачи' }
+            ],
+            showModal: false,
+            editingTask: null,  
+            isNewTask: false    
+        }
+    },
+    methods: {
+        filteredTasks(columnId) {
+            return this.tasks.filter(task => task.status === columnId);
+        },
        
-       openNewTaskModal() {
-           this.showModal = true;
-       },
+        openNewTaskModal() {
+            this.showModal = true;
+            this.editingTask = null;  
+            this.isNewTask = true;    
+        },
        
-       closeModal() {
-           this.showModal = false;
-       },
+        editTask(task) {
+            this.showModal = true;
+            this.editingTask = task;  
+            this.isNewTask = false;    
+        },
        
-       saveNewTask(formData) {
-           eventBus.$emit('create-task', formData);
-           this.closeModal();
-       }
-   }
+        saveTask(formData) {
+            if (this.isNewTask) {
+                eventBus.$emit('create-task', formData);
+            } else {
+                eventBus.$emit('update-task', {
+                    taskId: this.editingTask.id,
+                    ...formData
+                });
+            }
+            this.closeModal();
+        },
+       
+        closeModal() {
+            this.showModal = false;
+            this.editingTask = null;
+            this.isNewTask = false;
+        }
+    },
+    mounted() {
+        eventBus.$on('edit-task', this.editTask);
+        eventBus.$on('delete-task', (taskId) => {
+            eventBus.$emit('delete-task', taskId);
+        });
+    }
 })
 
 let app = new Vue({
-   el: '#app',
-   data: {
-       title: 'Kanban Board',
-       tasks: [
-           {
-               id: 1,
-               title: 'ыфвв',
-               description: 'ыфв',
-               deadline: '2026-03-17',
-               createdAt: new Date().toLocaleString(),
-               status: 'planned'
-           },
-           {
-               id: 2,
-               title: 'ddd',
-               description: 'dom',
-               deadline: '2026-03-16',
-               createdAt: new Date().toLocaleString(),
-               status: 'in-progress'
-           },
-           {
-               id: 3,
-               title: 'ууу',
-               description: 'раоо',
-               deadline: '2026-03-18',
-               createdAt: new Date().toLocaleString(),
-               status: 'testing'
-           }
-       ]
-   },
-   methods: {
-       generateId() {
-           return Date.now() + Math.random().toString(36).substr(2, 9);
-       },
+    el: '#app',
+    data: {
+        title: 'Kanban Board',
+        tasks: [
+            {
+                id: 1,
+                title: 'ыфвв',
+                description: 'ыфв',
+                deadline: '2026-03-17',
+                createdAt: new Date().toLocaleString(),
+                status: 'planned'
+            },
+            {
+                id: 2,
+                title: 'ddd',
+                description: 'dom',
+                deadline: '2026-03-16',
+                createdAt: new Date().toLocaleString(),
+                status: 'in-progress'
+            },
+            {
+                id: 3,
+                title: 'ууу',
+                description: 'раоо',
+                deadline: '2026-03-18',
+                createdAt: new Date().toLocaleString(),
+                status: 'testing'
+            }
+        ]
+    },
+    methods: {
+        generateId() {
+            return Date.now() + Math.random().toString(36).substr(2, 9);
+        },
        
-       createTask(taskData) {
-           const newTask = {
-               id: this.generateId(), 
-               ...taskData,             
-               createdAt: new Date().toLocaleString(),  
-               status: 'planned'        
-           };
-           this.tasks.push(newTask);
-       }
-   },
-   mounted() {
-       eventBus.$on('create-task', this.createTask);
-   }
+        createTask(taskData) {
+            const newTask = {
+                id: this.generateId(),
+                ...taskData,
+                createdAt: new Date().toLocaleString(),
+                status: 'planned'
+            };
+            this.tasks.push(newTask);
+        },
+       
+        updateTask(taskData) {
+            const index = this.tasks.findIndex(t => t.id === taskData.taskId);
+            if (index !== -1) {
+                this.tasks[index] = {
+                    ...this.tasks[index],
+                    ...taskData,
+                    editedAt: new Date().toLocaleString()  // Добавляем временной штамп
+                };
+                this.tasks = [...this.tasks];
+            }
+        },
+       
+        deleteTask(taskId) {
+            this.tasks = this.tasks.filter(task => task.id !== taskId);
+        }
+    },
+    mounted() {
+        eventBus.$on('create-task', this.createTask);
+        eventBus.$on('update-task', this.updateTask);  // Подписываемся на обновление
+        eventBus.$on('delete-task', this.deleteTask);  // Подписываемся на удаление
+    }
 })
