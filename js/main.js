@@ -9,31 +9,42 @@ Vue.component('task-modal', {
         isNew: {          
             type: Boolean,
             default: false
-        }
+        },
+        returnReason: { 
+           type: Boolean,
+           default: false
+       }
     },
     template: `
-        <div class="modal" @click.self="$emit('close')">
+     <div class="modal" @click.self="$emit('close')">
         <div class="modal-content">
-            <h3>{{ isNew ? 'Новая задача' : 'Редактирование задачи' }}</h3>
-         
-            <input 
-                v-model="formData.title" 
-                placeholder="Заголовок задачи"
-            >
-            <textarea 
-                v-model="formData.description" 
-                placeholder="Описание задачи"
-            ></textarea>
-            <input 
-                v-model="formData.deadline" 
-                type="date"
-            >
-         
-            <div class="modal-actions">
-                <button @click="$emit('close')">Отмена</button>
-                <button @click="saveTask">Сохранить</button>
+            <h3>{{ modalTitle }}</h3>
+            <template v-if="!returnReason">
+                <input 
+                    v-model="formData.title" 
+                    placeholder="Заголовок задачи"
+                >
+                <textarea 
+                    v-model="formData.description" 
+                    placeholder="Описание задачи"
+                ></textarea>
+                <input 
+                    v-model="formData.deadline" 
+                    type="date"
+                >
+            </template>
+            <div v-if="returnReason" class="reason-input">
+                <input 
+                    v-model="formData.returnReason" 
+                    placeholder="Укажите причину возврата"
+                >
             </div>
-        </div>
+         
+                <div class="modal-actions">
+                    <button @click="$emit('close')">Отмена</button>
+                    <button @click="saveTask">Сохранить</button>
+                </div>
+            </div>
         </div>
     `,
     data() {
@@ -41,8 +52,15 @@ Vue.component('task-modal', {
             formData: {
                 title: '',
                 description: '',
-                deadline: ''
+                deadline: '',
+                returnReason: ''
             }
+        }
+    },
+    computed: {
+        modalTitle() {
+            if (this.returnReason) return 'Укажите причину возврата';
+            return this.isNew ? 'Новая задача' : 'Редактирование задачи';
         }
     },
     methods: {
@@ -55,7 +73,8 @@ Vue.component('task-modal', {
             this.formData = {
                 title: this.task.title,
                 description: this.task.description,
-                deadline: this.task.deadline
+                deadline: this.task.deadline,
+                returnReason: this.task.returnReason || ''
             };
         }
     }
@@ -78,11 +97,14 @@ Vue.component('task-card', {
                 <span class="task-date">создано: {{ task.createdAt }}</span>
             </div>
        
-        <div class="task-description">{{ task.description }}</div>
+            <div class="task-description">{{ task.description }}</div>
        
             <div class="task-deadline">
                 Дедлайн: {{ task.deadline }}
                 <span v-if="task.editedAt"> | ред.: {{ task.editedAt }}</span>
+            </div>
+            <div v-if="task.returnReason" class="task-deadline" style="color: #ff4444;">
+                Причина возврата: {{ task.returnReason }}
             </div>
        
             <div class="task-actions">
@@ -90,6 +112,9 @@ Vue.component('task-card', {
                 <button @click="deleteTask" v-if="columnId === 'planned'">Удалить</button>
                 <button @click="moveTask" v-if="!isLastColumn">
                     {{ moveButtonText }}
+                </button>
+                <button @click="returnToWork" v-if="columnId === 'testing'">
+                    Вернуть в работу
                 </button>
             </div>
         </div>
@@ -126,7 +151,10 @@ Vue.component('task-card', {
                 taskId: this.task.id,
                 toColumn: moves[this.columnId]
             });
-        }
+        },
+        returnToWork() {
+            eventBus.$emit('return-task', this.task.id);
+       }
     }
 })
 Vue.component('kanban-board', {
@@ -163,7 +191,8 @@ Vue.component('kanban-board', {
         <task-modal
             v-if="showModal"
             :task="editingTask"      
-            :is-new="isNewTask"       
+            :is-new="isNewTask"      
+            :return-reason="showReturnReason" 
             @save="saveTask"
             @close="closeModal"
         ></task-modal>
@@ -179,7 +208,9 @@ Vue.component('kanban-board', {
             ],
             showModal: false,
             editingTask: null,  
-            isNewTask: false    
+            isNewTask: false,
+            showReturnReason: false,
+            returnTaskId: null
         }
     },
     methods: {
@@ -190,16 +221,32 @@ Vue.component('kanban-board', {
         openNewTaskModal() {
             this.showModal = true;
             this.editingTask = null;  
-            this.isNewTask = true;    
+            this.isNewTask = true;
+            this.showReturnReason = false;    
         },
        
         editTask(task) {
             this.showModal = true;
             this.editingTask = task;  
             this.isNewTask = false;    
+            this.showReturnReason = false;
+        },
+        returnTask(taskId) {
+            this.showModal = true;
+            this.showReturnReason = true;
+            this.returnTaskId = taskId;   
         },
        
         saveTask(formData) {
+            if (this.showReturnReason && this.returnTaskId) {
+                eventBus.$emit('task-returned', {
+                    taskId: this.returnTaskId,
+                    reason: formData.returnReason
+                });
+                this.closeModal();
+                return;
+            }
+
             if (this.isNewTask) {
                 eventBus.$emit('create-task', formData);
             } else {
@@ -215,10 +262,13 @@ Vue.component('kanban-board', {
             this.showModal = false;
             this.editingTask = null;
             this.isNewTask = false;
+            this.showReturnReason = false;
+            this.returnTaskId = null;
         }
     },
     mounted() {
         eventBus.$on('edit-task', this.editTask);
+        eventBus.$on('return-task', this.returnTask);
         eventBus.$on('delete-task', (taskId) => {
             eventBus.$emit('delete-task', taskId);
         });
@@ -300,6 +350,15 @@ let app = new Vue({
                 this.tasks[index].status = data.toColumn;
                 this.tasks = [...this.tasks];
             }
+        },
+        taskReturned(data) {
+            const index = this.tasks.findIndex(t => t.id === data.taskId);
+            if (index !== -1) {
+                this.tasks[index].status = 'in-progress';
+                this.tasks[index].returnReason = data.reason;
+                this.tasks[index].editedAt = new Date().toLocaleString();
+                this.tasks = [...this.tasks];
+            }
         }
     },
     mounted() {
@@ -307,5 +366,6 @@ let app = new Vue({
         eventBus.$on('update-task', this.updateTask);  
         eventBus.$on('delete-task', this.deleteTask);
         eventBus.$on('move-task', this.moveTask);  
+        eventBus.$on('task-returned', this.taskReturned);
     }
 })
