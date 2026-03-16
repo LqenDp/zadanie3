@@ -36,3 +36,42 @@ h1 {
    border-bottom: 1px solid #eee;
    padding-bottom: 10px;
 }
+.task-list {
+   min-height: 400px;
+}
+
+.task-card {
+   border: 1px solid #eee;
+   border-radius: 3px;
+   padding: 12px;
+   margin-bottom: 10px;
+   background-color: #f9f9f9;
+}
+
+.task-header {
+   display: flex;
+   justify-content: space-between;
+   align-items: center;
+   margin-bottom: 8px;
+}
+
+.task-title {
+   font-weight: bold;
+}
+
+.task-date {
+   font-size: 11px;
+   color: #999;
+}
+
+.task-description {
+   font-size: 13px;
+   margin-bottom: 8px;
+   color: #666;
+}
+
+.task-deadline {
+   font-size: 12px;
+   margin-bottom: 10px;
+   color: #555;
+}
