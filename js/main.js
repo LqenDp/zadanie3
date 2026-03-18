@@ -181,36 +181,39 @@ Vue.component('kanban-board', {
     },
     template: `
         <div>
-            <button @click="openNewTaskModal" style="margin-bottom: 20px;">
-                + Новая задача
-            </button>
-       
-        <div class="kanban-board">
+            <div class="kanban-board">
                 <div 
                     class="column" 
                     v-for="column in columns" 
                     :key="column.id"
                 >
-                <h2>{{ column.title }}</h2>
-                <div class="task-list">
-                    <task-card
-                        v-for="task in filteredTasks(column.id)"
-                        :key="task.id"
-                        :task="task"
-                        :column-id="column.id"  
-                    ></task-card>
+                    <h2>{{ column.title }}</h2>
+                    <div class="task-list">
+                        <button 
+                            v-if="column.id === 'planned'" 
+                            @click="openNewTaskModal"
+                        >
+                            + Новая задача
+                        </button>
+                        
+                        <task-card
+                            v-for="task in filteredTasks(column.id)"
+                            :key="task.id"
+                            :task="task"
+                            :column-id="column.id"  
+                        ></task-card>
+                    </div>
                 </div>
             </div>
-        </div>
-       
-        <task-modal
-            v-if="showModal"
-            :task="editingTask"      
-            :is-new="isNewTask"      
-            :return-reason="showReturnReason" 
-            @save="saveTask"
-            @close="closeModal"
-        ></task-modal>
+           
+            <task-modal
+                v-if="showModal"
+                :task="editingTask"      
+                :is-new="isNewTask"      
+                :return-reason="showReturnReason" 
+                @save="saveTask"
+                @close="closeModal"
+            ></task-modal>
         </div>
     `,
     data() {
@@ -234,6 +237,7 @@ Vue.component('kanban-board', {
         },
        
         openNewTaskModal() {
+            console.log('Opening new task modal'); 
             this.showModal = true;
             this.editingTask = null;  
             this.isNewTask = true;
@@ -241,18 +245,22 @@ Vue.component('kanban-board', {
         },
        
         editTask(task) {
+            console.log('Editing task:', task); 
             this.showModal = true;
             this.editingTask = task;  
             this.isNewTask = false;    
             this.showReturnReason = false;
-        },
+        },   
         returnTask(taskId) {
+            console.log('Return task:', taskId); 
             this.showModal = true;
             this.showReturnReason = true;
             this.returnTaskId = taskId;   
         },
        
         saveTask(formData) {
+            console.log('Saving task:', formData); 
+           
             if (this.showReturnReason && this.returnTaskId) {
                 eventBus.$emit('task-returned', {
                     taskId: this.returnTaskId,
@@ -274,6 +282,7 @@ Vue.component('kanban-board', {
         },
        
         closeModal() {
+            console.log('Closing modal'); 
             this.showModal = false;
             this.editingTask = null;
             this.isNewTask = false;
@@ -282,11 +291,18 @@ Vue.component('kanban-board', {
         }
     },
     mounted() {
+        console.log('Kanban board mounted');       
         eventBus.$on('edit-task', this.editTask);
-        eventBus.$on('return-task', this.returnTask);
+        eventBus.$on('return-task', this.returnTask);   
         eventBus.$on('delete-task', (taskId) => {
+            console.log('Delete task event received:', taskId);
             eventBus.$emit('delete-task', taskId);
         });
+    },
+    beforeDestroy() {
+        eventBus.$off('edit-task', this.editTask);
+        eventBus.$off('return-task', this.returnTask);
+        eventBus.$off('delete-task');
     }
 })
 
@@ -307,7 +323,7 @@ let app = new Vue({
                 id: 2,
                 title: 'ddd',
                 description: 'dom',
-                deadline: '2026-03-17',
+                deadline: '2026-03-20',
                 createdAt: new Date().toLocaleString(),
                 status: 'in-progress'
             },
@@ -315,7 +331,7 @@ let app = new Vue({
                 id: 3,
                 title: 'ууу',
                 description: 'раоо',
-                deadline: '2026-03-18',
+                deadline: '2026-03-21',
                 createdAt: new Date().toLocaleString(),
                 status: 'testing'
             },
@@ -323,7 +339,7 @@ let app = new Vue({
                 id: 4,
                 title: 'aaa',
                 description: 'AA',
-                deadline: '2026-03-19',
+                deadline: '2026-03-22',
                 createdAt: new Date().toLocaleString(),
                 status: 'completed'
             },

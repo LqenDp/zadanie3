@@ -76,6 +76,16 @@ h1 {
    color: #555;
 }
 
+.task-card.completed .task-deadline {
+   color: #4CAF50;
+   font-weight: bold;
+}
+
+.task-card.overdue .task-deadline {
+   color: #ff4444;
+   font-weight: bold;
+}
+
 .modal {
    position: fixed;
    top: 0;
@@ -86,6 +96,7 @@ h1 {
    display: flex;
    justify-content: center;
    align-items: center;
+   z-index: 1000;
 }
 
 .modal-content {
@@ -146,9 +157,6 @@ button:hover {
    border-radius: 3px;
 }
 
-.task-card .task-deadline[style*="color: #ff4444"] {
-   font-weight: bold;
-}
 .task-card.completed {
    background-color: #f0f0f0;
    border-color: #ddd;
@@ -163,13 +171,4 @@ button:hover {
 
 .task-card.overdue .task-title {
    color: #cc0000;
-}
-
-.task-card.overdue .task-deadline {
-   color: #ff4444;
-   font-weight: bold;
-}
-
-.task-card.overdue {
-   animation: pulse 2s infinite;
 }
