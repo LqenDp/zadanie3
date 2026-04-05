@@ -78,7 +78,8 @@ Vue.component('task-modal', {
             };
         }
     }
-})
+});
+
 Vue.component('task-card', {
     props: {
         task: {
@@ -91,33 +92,38 @@ Vue.component('task-card', {
         }
     },
     template: `
-    
-        <div class="task-card" :class="cardClass">
-        <div class="task-header">
-            <span class="task-title">{{ task.title }}</span>
-            <span class="task-date">создано: {{ task.createdAt }}</span>
-        </div>
-       
-        <div class="task-description">{{ task.description }}</div>
-       
-        <div class="task-deadline">
-            Дедлайн: {{ task.deadline }}
-            <span v-if="task.editedAt"> | ред.: {{ task.editedAt }}</span>
-         
-            <span v-if="isOverdue" style="color: #ff4444; font-weight: bold;"> (просрочено!)</span>
-        </div>
-       
-        <div v-if="task.returnReason" class="task-deadline" style="color: #ff4444;">
-            Причина возврата: {{ task.returnReason }}
-        </div>
-       
-        <div class="task-actions">
-            <button @click="editTask">Редактировать</button>
-            <button @click="deleteTask" v-if="columnId === 'planned'">Удалить</button>
-            <button @click="moveTask" v-if="!isLastColumn">{{ moveButtonText }}</button>
-            <button @click="returnToWork" v-if="columnId === 'testing'">
-                Вернуть в работу
-            </button>
+        <div 
+            class="task-card" 
+            :class="cardClass"
+            draggable="true"
+            @dragstart="onDragStart"
+            @dragend="onDragEnd"
+        >
+            <div class="task-header">
+                <span class="task-title">{{ task.title }}</span>
+                <span class="task-date">создано: {{ task.createdAt }}</span>
+            </div>
+           
+            <div class="task-description">{{ task.description }}</div>
+           
+            <div class="task-deadline">
+                Дедлайн: {{ task.deadline }}
+                <span v-if="task.editedAt"> | ред.: {{ task.editedAt }}</span>
+             
+                <span v-if="isOverdue" style="color: #ff4444; font-weight: bold;"> (просрочено!)</span>
+            </div>
+           
+            <div v-if="task.returnReason" class="task-deadline" style="color: #ff4444;">
+                Причина возврата: {{ task.returnReason }}
+            </div>
+           
+            <div class="task-actions">
+                <button @click="editTask">Редактировать</button>
+                <button @click="deleteTask" v-if="columnId === 'planned'">Удалить</button>
+                <button @click="moveTask" v-if="!isLastColumn">{{ moveButtonText }}</button>
+                <button @click="returnToWork" v-if="columnId === 'testing'">
+                    Вернуть в работу
+                </button>
             </div>
         </div>
     `,
@@ -140,7 +146,6 @@ Vue.component('task-card', {
             return deadline < today;
         },
        
-      
         cardClass() {
             if (this.columnId === 'completed') {
                 return this.isOverdue ? 'overdue' : 'completed';
@@ -169,9 +174,21 @@ Vue.component('task-card', {
         },
         returnToWork() {
             eventBus.$emit('return-task', this.task.id);
-       }
+        },
+        onDragStart(event) {
+            event.dataTransfer.setData('text/plain', JSON.stringify({
+                taskId: this.task.id,
+                fromColumn: this.columnId
+            }));
+            event.dataTransfer.effectAllowed = 'move';
+            event.target.style.opacity = '0.5';
+        },
+        onDragEnd(event) {
+            event.target.style.opacity = '';
+        }
     }
-})
+});
+
 Vue.component('kanban-board', {
     props: {
         tasks: {
@@ -186,6 +203,9 @@ Vue.component('kanban-board', {
                     class="column" 
                     v-for="column in columns" 
                     :key="column.id"
+                    :data-column-id="column.id"
+                    @dragover.prevent
+                    @drop="onDrop($event, column.id)"
                 >
                     <h2>{{ column.title }}</h2>
                     <div class="task-list">
@@ -288,6 +308,42 @@ Vue.component('kanban-board', {
             this.isNewTask = false;
             this.showReturnReason = false;
             this.returnTaskId = null;
+        },
+        
+        onDrop(event, toColumn) {
+            event.preventDefault();
+            
+            const dragData = JSON.parse(event.dataTransfer.getData('text/plain'));
+            const fromColumn = dragData.fromColumn;
+            const taskId = dragData.taskId;
+            
+            if (fromColumn === toColumn) {
+                return;
+            }
+            
+            let targetColumn = toColumn;
+
+            if (fromColumn === 'planned' && toColumn === 'in-progress') {
+                eventBus.$emit('move-task', { taskId, toColumn: 'in-progress' });
+            } 
+            else if (fromColumn === 'in-progress' && toColumn === 'testing') {
+                eventBus.$emit('move-task', { taskId, toColumn: 'testing' });
+            }
+            else if (fromColumn === 'testing' && toColumn === 'completed') {
+                eventBus.$emit('move-task', { taskId, toColumn: 'completed' });
+            }
+            else if (fromColumn === 'testing' && toColumn === 'in-progress') {
+               
+                eventBus.$emit('return-task', taskId);
+            }
+            else {
+                alert(`Нельзя переместить задачу из "${this.getColumnTitle(fromColumn)}" в "${this.getColumnTitle(toColumn)}"`);
+            }
+        },
+        
+        getColumnTitle(columnId) {
+            const column = this.columns.find(c => c.id === columnId);
+            return column ? column.title : columnId;
         }
     },
     mounted() {
@@ -304,7 +360,7 @@ Vue.component('kanban-board', {
         eventBus.$off('return-task', this.returnTask);
         eventBus.$off('delete-task');
     }
-})
+});
 
 let app = new Vue({
     el: '#app',
@@ -374,7 +430,7 @@ let app = new Vue({
                 this.tasks[index] = {
                     ...this.tasks[index],
                     ...taskData,
-                    editedAt: new Date().toLocaleString()  // Добавляем временной штамп
+                    editedAt: new Date().toLocaleString()
                 };
                 this.tasks = [...this.tasks];
             }
@@ -383,6 +439,7 @@ let app = new Vue({
         deleteTask(taskId) {
             this.tasks = this.tasks.filter(task => task.id !== taskId);
         },
+        
         moveTask(data) {
             const index = this.tasks.findIndex(t => t.id === data.taskId);
             if (index !== -1) {
@@ -398,6 +455,7 @@ let app = new Vue({
                 this.tasks = [...this.tasks];
             }
         },
+        
         taskReturned(data) {
             const index = this.tasks.findIndex(t => t.id === data.taskId);
             if (index !== -1) {
@@ -415,4 +473,4 @@ let app = new Vue({
         eventBus.$on('move-task', this.moveTask);  
         eventBus.$on('task-returned', this.taskReturned);
     }
-})
+});
